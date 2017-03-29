@@ -2,7 +2,7 @@
 import boto3
 import argparse
 import logging
-
+from datetime import datetime, timedelta
 
 # Set up logger
 logging.getLogger(__name__)
@@ -32,27 +32,40 @@ def getServices(clusterName):
 #        print response
         services.extend(response['serviceArns'])
 
-    print "number services read " + str(len(services))
+    if (verbose):
+        print "number services read " + str(len(services))
+
     return services
 
 
 def unableEvents(events):
-    print "events"
+    if (verbose):
+        print "events"
+
+    numberFound = 0
     for event in events:
         message = event['message']
         if ("unable" not in message):
             continue
-        print "\tmessage", message
-        #        print "\tid", event['id']
-        print "\tcreatedAt", event['createdAt'], "\n"
-    return
+
+        createdAt = str(event['createdAt'])
+        if ((monthDayToday in createdAt) or (monthDayYesterday in createdAt)):
+            numberFound += 1
+            if (verbose):
+                print "\tmessage", message
+                print "\tcreatedAt", createdAt, "\n"
+    return numberFound
 
 
 def unableServices(services):
-    #    print "services"
+    if (verbose):
+        print "services"
+
+    numberFound = 0
     for service in services:
-        #        print service
-        print "serviceName", service['serviceName']
+        if (verbose):
+            print service
+            print "serviceName", service['serviceName']
 #        print "runningCount", service['runningCount'], "desiredCount", service['desiredCount'], "pendingCount", service['pendingCount']
 #        print "placementConstraints", service['placementConstraints'], "placementStrategy", service['placementStrategy']
 #        print "status", service['status']
@@ -64,21 +77,21 @@ def unableServices(services):
 #        #        print "serviceArn", service['serviceArn']
 #        print "deploymentConfiguration", service['deploymentConfiguration']
 #        #        print "deployments", service['deployments']
-        unableEvents(service['events'])
-    return
-
+        numberFound += unableEvents(service['events'])
+    return numberFound
 
 
 def findUnable(clusterName, service):
-    print "findUnable", service
+    if (verbose):
+        print "findUnable", service
+
     services = []
     services.append(service)
     response = ecs.describe_services(cluster=clusterName, services=services)
     #    for k, v in response.items():
     #        print "key " + k
     #        print(k, v)
-    unableServices(response['services'])
-    return
+    return unableServices(response['services'])
 
 
 def printEvents(events):
@@ -121,31 +134,57 @@ def printService(clusterName, service):
     printServices(response['services'])
     return
 
+def setDates():
+    today = datetime.now()
+#    print "Today " + today.strftime('%Y-%m-%d %H:%M:%S')
+    global monthDayToday
+    monthDayToday = today.strftime('%Y-%m-%d')
+#    print "monthDay", monthDayToday
+    yesterday = today - timedelta(days=1)
+#    print "Yesterday " + yesterday.strftime('%Y-%m-%d %H:%M:%S')
+    global monthDayYesterday
+    monthDayYesterday = yesterday.strftime('%Y-%m-%d')
+#    print "monthDayYesterday", monthDayYesterday
+    return
+
 
 def doService(clusterName):
-    print "doService", service
+    if (verbose):
+        print "doService", service
+
+    setDates()
     if ((service != "ALL") and (service != "all")):
         if (verbose):
             printService(clusterName, service)
-        findUnable(clusterName, service)
-        return
+        numberFound = findUnable(clusterName, service)
+        if (numberFound > 0):
+            print "For service " + service + " we found " + str(numberFound) + " failed tasks"
+        return numberFound
 
-    print "doAll"
+    if (verbose):
+        print "doAll"
+
+    numberFound = 0
     services = getServices(clusterName)
     for serviceLocal in services:
         if (verbose):
             printService(clusterName, serviceLocal)
-        findUnable(clusterName, serviceLocal)
+        numberFoundService = findUnable(clusterName, serviceLocal)
+        numberFound += numberFoundService
+        if (numberFoundService > 0):
+            print "For service " + serviceLocal.split("/")[1] + " we found " + str(numberFoundService) + " failed tasks"
 #    services.append(service)
 #    response = ecs.describe_services(cluster=clusterName, services=services)
 #    for k, v in response.items():
 #        print "key " + k
 #        print(k, v)
 #    printServices(response['services'])
-    return
+    return numberFound
 
 def doit(clusterName):
-    doService(clusterName)
+    numberFound = doService(clusterName)
+    if (numberFound > 0):
+        print "Overall we found " + str(numberFound) + " failed tasks"
     return
 
 if __name__ == "__main__":
