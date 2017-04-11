@@ -31,7 +31,9 @@ def getServices(clusterName):
 #    maxResults=123
 #)
     services = []
+    print "pre list_services " + clusterName
     response = ecs.list_services(cluster=clusterName)
+    print "post list_services " + clusterName
 #    print "Got one cluster " + clusterName
 #    print response
     services.extend(response['serviceArns'])
@@ -154,6 +156,7 @@ def setDates():
 
 
 def doService(clusterName, region):
+    print "in doService"
     if (verbose):
         print "doService", service
 
@@ -171,8 +174,11 @@ def doService(clusterName, region):
         print "doAll"
 
     numberFound = 0
+    print "pre getServices"
     services = getServices(clusterName)
+    print "post getServices"
     for serviceLocal in services:
+        print "in serviceLoop" + serviceLocal
         if (verbose):
             printService(clusterName, serviceLocal)
         numberFoundService = findUnable(clusterName, serviceLocal)
@@ -218,7 +224,9 @@ def createAndSendMetric(cluster, region, serviceNameIfExists, count):
     return
 
 def doit(clusterName, region):
+    print "in doit"
     numberFound = doService(clusterName, region)
+    print "after doService"
     if (numberFound > 0):
         print "Overall we found " + str(numberFound) + " failed tasks"
     return
@@ -243,8 +251,8 @@ def getLiveEnvironment():
     return "NothingLive"
 
 def unableHandler(event, context):
-    message = event[0]
-    print "Event is", message
+#    message = event[0]
+#    print "Event is", message
     global verbose
     verbose = False
     global service
@@ -259,6 +267,7 @@ def unableHandler(event, context):
         global ecs
         ecs = boto3.client('ecs', region_name=cluster.region)
         doit(cluster.name, cluster.region)
+        print "post doit"
     return
 
 
