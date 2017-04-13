@@ -23,6 +23,70 @@ class clusterDefinition(object):
         return "Cluster name " + self.name + " region " + self.region
 
 
+def unableHandler(event, context):
+    global verbose
+    verbose = False
+    global service
+    service = "all"
+    global liveEnvironment
+    liveEnvironment = getLiveEnvironment()
+
+    clusters = createClusters()
+    for cluster in clusters:
+        print "doing cluster", cluster.toString()
+
+        global ecs
+        ecs = boto3.client('ecs', region_name=cluster.region)
+        doit(cluster.name, cluster.region)
+    return
+
+
+def createClusters():
+    clusters = []
+    clusters.append(clusterDefinition("qa-11", "us-east-1"))
+    clusters.append(clusterDefinition("prod-11", "us-east-1"))
+    clusters.append(clusterDefinition("qa-21", "us-west-2"))
+    clusters.append(clusterDefinition("prod-21", "us-west-2"))
+    return clusters
+
+def outputToWavefrontService(cluster, region, serviceName, count):
+    createAndSendMetric(cluster, region, "." + serviceName, count)
+    return
+
+def outputToWavefrontNoService(cluster, region, count):
+    createAndSendMetric(cluster, region, "", count)
+    return
+
+def createAndSendMetric(cluster, region, serviceNameIfExists, count):
+    #com.edmunds.ops.aws.ecs.{REGION}.{CLUSTER_NAME}.{SERVICE_NAME}.tasks.error.{ERROR-KEY}.count
+    metric = "com.edmunds.ops.aws.ecs." + region + "." + cluster + serviceNameIfExists + ".tasks.error.unabletoplace.count"
+    if (liveEnvironment == 'prod-21'):
+        proxy_url = 'wavefront-proxy.prod-21.vip.aws2'
+    else:
+        proxy_url = 'wavefront-proxy.prod-11.vip.aws1'
+
+    s = socket.socket()
+    s.connect((proxy_url, 2878))
+    timestamp = int(time.time())
+    message = metric + " %d %d source=%s\n" % (count, timestamp, liveEnvironment)
+    print "Sending to Wavefront " + message
+    s.send(message)
+    s.close()
+    return
+
+
+def getLiveEnvironment():
+    request = requests.get("http://emon-api.prod-admin11.vip.aws1/api/environments")
+
+    results = json.loads(request.text)
+
+    for env in results['data']:
+        if (env['type'] == "media"):
+            if (env['is_live'] == True):
+                return env['name']
+    return "NothingLive"
+
+
 def getServices(clusterName):
 #    print "getServices"
 #response = client.list_services(
@@ -192,74 +256,11 @@ def doService(clusterName, region):
         outputToWavefrontNoService(clusterName, region, numberFound)
     return numberFound
 
-def outputToWavefrontService(cluster, region, serviceName, count):
-    createAndSendMetric(cluster, region, "." + serviceName, count)
-    return
-
-def outputToWavefrontNoService(cluster, region, count):
-    createAndSendMetric(cluster, region, "", count)
-    return
-
-def createAndSendMetric(cluster, region, serviceNameIfExists, count):
-    #com.edmunds.ops.aws.ecs.{REGION}.{CLUSTER_NAME}.{SERVICE_NAME}.tasks.error.{ERROR-KEY}.count
-    metric = "com.edmunds.ops.aws.ecs." + region + "." + cluster + serviceNameIfExists + ".tasks.error.unabletoplace.count"
-    if (liveEnvironment == 'prod-21'):
-        proxy_url = 'wavefront-proxy.prod-21.vip.aws2'
-    else:
-        proxy_url = 'wavefront-proxy.prod-11.vip.aws1'
-
-    s = socket.socket()
-    s.connect((proxy_url, 2878))
-    timestamp = int(time.time())
-    message = metric + " %d %d source=%s\n" % (count, timestamp, liveEnvironment)
-    print "Sending to Wavefront " + message
-    s.send(message)
-    s.close()
-    return
 
 def doit(clusterName, region):
     numberFound = doService(clusterName, region)
     if (numberFound > 0):
         print "Overall we found " + str(numberFound) + " failed tasks"
-    return
-
-
-def createClusters():
-    clusters = []
-    clusters.append(clusterDefinition("qa-11", "us-east-1"))
-    clusters.append(clusterDefinition("prod-11", "us-east-1"))
-    clusters.append(clusterDefinition("qa-21", "us-west-2"))
-    clusters.append(clusterDefinition("prod-21", "us-west-2"))
-    return clusters
-
-def getLiveEnvironment():
-    request = requests.get("http://emon-api.prod-admin11.vip.aws1/api/environments")
-
-    results = json.loads(request.text)
-
-    for env in results['data']:
-        if (env['type'] == "media"):
-            if (env['is_live'] == True):
-                return env['name']
-    return "NothingLive"
-
-def unableHandler(event, context):
-#    message = event[0]
-#    print "Event is", message
-    global verbose
-    verbose = False
-    global service
-    service = "all"
-    global liveEnvironment
-    liveEnvironment = getLiveEnvironment()
-
-    clusters = createClusters()
-    for cluster in clusters:
-        print "doing cluster", cluster.toString()
-
-        global ecs
-        ecs = boto3.client('ecs', region_name=cluster.region)
-        doit(cluster.name, cluster.region)
     return
 
 
@@ -285,7 +286,7 @@ if __name__ == "__main__":
                         nargs='?',
                         required=False,
                         default=None,
-                        help='Will list the requested service'
+                        help='Will process the requested service, all is allowed'
     )
     parser.add_argument('-l', '--lambdaAws',
                         nargs='?',
