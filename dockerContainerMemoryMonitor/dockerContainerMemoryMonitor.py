@@ -2,12 +2,13 @@
 import boto3
 import argparse
 import logging
-from datetime import datetime, timedelta
 import json
 import time
 import requests
 import socket
 
+
+memoryPercentage = 0.3
 
 # Set up logger
 logging.getLogger(__name__)
@@ -36,8 +37,6 @@ def memoryHandler(event, context):
 
         global ecs
         ecs = boto3.client('ecs', region_name=cluster.region)
-        global taskDescriptions
-        taskDescriptions = None
         doit(cluster.name, cluster.region)
     return
 
@@ -55,9 +54,11 @@ def outputToWavefrontTask(cluster, region, taskName, count):
     createAndSendMetric(cluster, region, "." + taskName, count)
     return
 
+
 def outputToWavefrontNoTask(cluster, region, count):
     createAndSendMetric(cluster, region, "", count)
     return
+
 
 def createAndSendMetric(cluster, region, taskNameIfExists, count):
     #com.edmunds.ops.aws.ecs.{REGION}.{CLUSTER_NAME}.{SERVICE_NAME}.tasks.error.{ERROR-KEY}.count
@@ -79,7 +80,6 @@ def createAndSendMetric(cluster, region, taskNameIfExists, count):
 
 def getLiveEnvironment():
     request = requests.get("http://emon-api.prod-admin11.vip.aws1/api/environments")
-
     results = json.loads(request.text)
 
     for env in results['data']:
@@ -168,9 +168,9 @@ def printInterestingContainerDefinition(containerDefinition):
     memoryContainer = containerDefinition['memory']
     memoryJava = getMaxMemoryJava(containerDefinition['environment'])
     memoryLeft = memoryContainer - memoryJava
-    memory80 = memoryContainer * 0.2
-    if (memoryLeft < memory80):
-        print "Memory may be too constrained container", memoryContainer, "java", memoryJava, "diff", memoryLeft, "would like", memory80
+    memoryWanted = memoryContainer * memoryPercentage
+    if (memoryLeft < memoryWanted):
+        print "Memory may be too constrained container", memoryContainer, "java", memoryJava, "diff", memoryLeft, "would like", memoryWanted
 
 
 def printContainerDefinitions(containerDefinitions):
@@ -211,6 +211,7 @@ def printTaskDefinition(taskDefinitionId):
     printContainerDefinitions(taskDefinition['containerDefinitions'])
     print "\trevision",taskDefinition['revision']
     return
+
 
 def getTaskDescriptions(clusterName, tasks):
     #    print "getTaskDescriptions"
@@ -261,9 +262,9 @@ def isUndersizedInterestingContainerDefinition(containerDefinition):
     memoryContainer = containerDefinition['memory']
     memoryJava = getMaxMemoryJava(containerDefinition['environment'])
     memoryLeft = memoryContainer - memoryJava
-    memory70 = memoryContainer * 0.3
-    if (memoryLeft < memory70):
-        print "Memory may be too constrained container", memoryContainer, "java", memoryJava, "diff", memoryLeft, "would like", memory70
+    memoryWanted = memoryContainer * memoryPercentage
+    if (memoryLeft < memoryWanted):
+        print "Memory may be too constrained container", memoryContainer, "java", memoryJava, "diff", memoryLeft, "would like", memoryWanted
         return True
 
     return False
@@ -374,6 +375,8 @@ def doTasks(clusterName, region):
 
 
 def doit(clusterName, regionName):
+    global taskDescriptions
+    taskDescriptions = None
     doTasks(clusterName, regionName)
     return
 
@@ -409,19 +412,16 @@ if __name__ == "__main__":
                         help='Whether to run Lambda'
     )
     args = parser.parse_args()
-    regionName = args.region
-
-    global ecs
-    ecs = boto3.client('ecs', region_name=regionName)
-    global verbose
-    verbose = (args.verbose == 'True')
-    global taskDescriptions
-    taskDescriptions = None
 
     if (args.lambdaAws == 'True'):
         event = ['dummy event']
         context = None
         memoryHandler(event, context)
     else:
+        regionName = args.region
+        global verbose
+        verbose = (args.verbose == 'True')
+        global ecs
+        ecs = boto3.client('ecs', region_name=regionName)
         logging.info('Monitoring cluster %s on region %s...', args.cluster, regionName)
         doit(args.cluster, regionName)

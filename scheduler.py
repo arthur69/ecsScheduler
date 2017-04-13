@@ -4,6 +4,8 @@ import argparse
 import logging
 
 
+memoryPercentage = 0.3
+
 class EC2Container(object):
     def __init__(self, name):
         self.name = name
@@ -330,9 +332,9 @@ def printInterestingContainerDefinition(containerDefinition):
         memoryContainer = containerDefinition['memory']
         memoryJava = getMaxMemoryJava(containerDefinition['environment'])
         memoryLeft = memoryContainer - memoryJava
-        memory80 = memoryContainer * 0.2
-        if (memoryLeft < memory80):
-            print "Memory may be too constrained container", memoryContainer, "java", memoryJava, "diff", memoryLeft, "would like", memory80
+        memoryWanted = memoryContainer * memoryPercentage
+        if (memoryLeft < memoryWanted):
+            print "Memory may be too constrained container", memoryContainer, "java", memoryJava, "diff", memoryLeft, "would like", memoryWanted
 
 
 def printContainerDefinitions(containerDefinitions):
@@ -373,6 +375,7 @@ def printTaskDefinition(taskDefinitionId):
     printContainerDefinitions(taskDefinition['containerDefinitions'])
     print "\trevision",taskDefinition['revision']
     return
+
 
 def getTaskDescriptions(clusterName, tasks):
 #    print "getTaskDescriptions"

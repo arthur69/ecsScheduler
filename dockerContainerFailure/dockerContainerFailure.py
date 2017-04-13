@@ -49,13 +49,16 @@ def createClusters():
     clusters.append(clusterDefinition("prod-21", "us-west-2"))
     return clusters
 
+
 def outputToWavefrontService(cluster, region, serviceName, count):
     createAndSendMetric(cluster, region, "." + serviceName, count)
     return
 
+
 def outputToWavefrontNoService(cluster, region, count):
     createAndSendMetric(cluster, region, "", count)
     return
+
 
 def createAndSendMetric(cluster, region, serviceNameIfExists, count):
     #com.edmunds.ops.aws.ecs.{REGION}.{CLUSTER_NAME}.{SERVICE_NAME}.tasks.error.{ERROR-KEY}.count
@@ -77,7 +80,6 @@ def createAndSendMetric(cluster, region, serviceNameIfExists, count):
 
 def getLiveEnvironment():
     request = requests.get("http://emon-api.prod-admin11.vip.aws1/api/environments")
-
     results = json.loads(request.text)
 
     for env in results['data']:
@@ -203,6 +205,7 @@ def printService(clusterName, service):
     printServices(response['services'])
     return
 
+
 def setDates():
     today = datetime.now()
 #    print "Today " + today.strftime('%Y-%m-%d %H:%M:%S')
@@ -295,20 +298,19 @@ if __name__ == "__main__":
                         help='Whether to run Lambda'
     )
     args = parser.parse_args()
-    regionName = args.region
-
-    global ecs
-    ecs = boto3.client('ecs', region_name=regionName)
-    global verbose
-    verbose = (args.verbose == 'True')
-    global service
-    service = args.service
 
     if (args.lambdaAws == 'True'):
         event = ['dummy event']
         context = None
         unableHandler(event, context)
     else:
+        regionName = args.region
+        global ecs
+        ecs = boto3.client('ecs', region_name=regionName)
+        global verbose
+        verbose = (args.verbose == 'True')
+        global service
+        service = args.service
         logging.info('Monitoring cluster %s on region %s...', args.cluster, regionName)
         doit(args.cluster, regionName)
 
