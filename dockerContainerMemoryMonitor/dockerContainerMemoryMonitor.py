@@ -366,10 +366,10 @@ def doTasks(clusterName, region):
                 numberTooSmall += 1
                 taskName = getTaskName(taskDescription)
                 print "For task " + taskName + " we found too small"
-#                outputToWavefrontTask(clusterName, region, taskName, count)
+                outputToWavefrontTask(clusterName, region, taskName, count)
 
-            #                outputToWavefrontNoTask(clusterName, region, numberTooSmall)
-    print "Number tasks " + str(len(taskDescriptions)) + " and unique tasks " + str(numberUnique)
+    outputToWavefrontNoTask(clusterName, region, numberTooSmall)
+    print "Number tasks " + str(len(taskDescriptions)) + " and unique tasks " + str(numberUnique) + " and too small " + str(numberTooSmall)
     return
 
 
