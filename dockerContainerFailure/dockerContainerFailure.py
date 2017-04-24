@@ -262,6 +262,14 @@ def doService(clusterName, region):
 def doit(clusterName, region):
     numberFound = doService(clusterName, region)
     if (numberFound > 0):
+        print "Total found " + str(numberFound) + " failed tasks"
+        outputToWavefrontNoService(clusterName, region, numberFound)
+    return numberFound
+
+
+def doit(clusterName, region):
+    numberFound = doService(clusterName, region)
+    if (numberFound > 0):
         print "Overall we found " + str(numberFound) + " failed tasks"
     return
 
