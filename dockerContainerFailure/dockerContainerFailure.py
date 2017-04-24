@@ -254,9 +254,8 @@ def doService(clusterName, region):
 #        print "key " + k
 #        print(k, v)
 #    printServices(response['services'])
-    if (numberFound > 0):
-        print "Total found " + str(numberFound) + " failed tasks"
-        outputToWavefrontNoService(clusterName, region, numberFound)
+    print "Total found " + str(numberFound) + " failed tasks"
+    outputToWavefrontNoService(clusterName, region, numberFound)
     return numberFound
 
 
