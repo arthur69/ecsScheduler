@@ -6,6 +6,7 @@ globalFilename = None
 globalFirstLine = None
 globalResponseCode = None
 globalBody = ''
+globalResponseNormal = False
 
 
 def printFileResponse():
@@ -13,6 +14,10 @@ def printFileResponse():
     global globalFirstLine
     global globalResponseCode
     global globalBody
+    global globalResponseNormal
+
+    if (globalResponseNormal):
+        return
 
     if (globalFilename is not None):
         print "file=" + globalFilename
@@ -22,9 +27,10 @@ def printFileResponse():
         print globalFirstLine
         globalFirstLine = None
 
-    if (globalResponseCode is not None):
-        print globalResponseCode
-        globalResponseCode = None
+    if (not globalResponseNormal):
+        if (globalResponseCode is not None):
+            print globalResponseCode
+            globalResponseCode = None
 
     if (globalBody is not ''):
         print globalBody
@@ -132,15 +138,23 @@ def getRequest(urlPartial):
     try:
         response = requests.get(url = "https://www.edmunds.com" + str(urlPartial))
         global globalResponseCode
+        global globalBody
+        global globalResponseNormal
 
         globalResponseCode = "response is " + str(response.status_code) + " history " + str(response.history)
+        if (response.status_code == 200):
+            if (response.history):
+                globalResponseNormal = False
+            else:
+                globalResponseNormal = True
+        else:
+            globalResponseNormal = False
         printFileResponse()
 
         try:
             body = response.json()
 #            print body
-            global globalBody
-            globlBody = "json not being printed"
+            globalBody = "json not being printed"
         #        print404(body)
             return
         except ValueError:
@@ -156,11 +170,13 @@ def getRequest(urlPartial):
             print "response.text failed "
             print wtf
     except TypeError as typeError:
-        print "Problem with urlPartial " + str(typeError)
+        globalBody = "Problem with urlPartial " + str(typeError)
     except requests.exceptions.ConnectionError as connectionError:
-        print "Problem with urlPartial connection " + str(connectionError)
+        globalBody = "Problem with urlPartial connection " + str(connectionError)
     except requests.exceptions.InvalidURL as invalidURL:
-        print "Problem with urlPartial " + str(invalidURL)
+        globalBody = "Problem with urlPartial " + str(invalidURL)
+
+    printFileResponse()
 
 clientS3 = boto3.client('s3')
 resourceS3 = boto3.resource('s3')
